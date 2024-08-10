@@ -1,6 +1,6 @@
-import { Module } from '@nestjs/common';
-import { ConverterService } from './converter.service';
-import { ConverterController } from './converter.controller';
+import { Module } from "@nestjs/common";
+import { ConverterService } from "./converter.service";
+import { ConverterController } from "./converter.controller";
 
 @Module({
   providers: [ConverterService],

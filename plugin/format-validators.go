@@ -1,4 +1,4 @@
-package plugin
+package main
 
 import (
 	"encoding/binary"
@@ -15,43 +15,44 @@ func isValidFormat(format string) bool {
 	}
 }
 
-func validateDataFormat(inputFormat Format, data []byte) (*MessageData, bool) {
+func validateDataFormat(inputFormat Format, data []byte, disableLogs bool) (*MessageData, bool) {
 	switch inputFormat {
 	case AOS:
-		println("validating AOS Format...")
-		return validateAOSFormat(data)
+		if !disableLogs {
+			println("validating AOS Format...")
+		}
+		return validateAOSFormat(data, disableLogs)
 	case PUS_TM:
-		return validatePUSTMFormat(data)
+		return validatePUSTMFormat(data, disableLogs)
 	case PUS_TC:
-		return validatePUSTCFormat(data)
+		return validatePUSTCFormat(data, disableLogs)
 	case CCSDS:
-		return validateCCSDSFormat(data)
+		return validateCCSDSFormat(data, disableLogs)
 	default:
 		return nil, false
 	}
 }
 
-func validateAOSFormat(data []byte) (*MessageData, bool) {
-	// Define minimum header length: spacecraft ID (2 bytes) + virtual channel ID (1 byte) + CRC (4 bytes)
+func validateAOSFormat(data []byte, disableLogs bool) (*MessageData, bool) {
 	const minHeaderLength = 2 + 1 + 4
 
-	// Check if data is long enough to contain at least the header and CRC
 	if len(data) < minHeaderLength {
-		println("AOS header length is too short.")
+		if !disableLogs {
+			println("AOS header length is too short.")
+		}
 		return nil, false
 	}
 
-	// Extract the header and CRC from the data
 	header := data[:2+1]
 	crcReceived := binary.BigEndian.Uint32(data[len(data)-4:])
 	dataWithoutCRC := data[:len(data)-4]
 
-	// Compute the CRC for the data (excluding the CRC itself)
 	crcComputed := crc32.ChecksumIEEE(dataWithoutCRC)
 
-	// Validate the computed CRC against the received CRC
 	if crcReceived != crcComputed {
-		println("AOS crc is invalid.")
+		if !disableLogs {
+			println("AOS crc is invalid.")
+		}
 		return nil, false
 	}
 
@@ -59,7 +60,9 @@ func validateAOSFormat(data []byte) (*MessageData, bool) {
 		dataWithoutCRC = dataWithoutCRC[3:]
 	}
 
-	printAOSFrame(header, dataWithoutCRC, crcReceived)
+	if !disableLogs {
+		printAOSFrame(header, dataWithoutCRC, crcReceived)
+	}
 
 	return &MessageData{RawData: dataWithoutCRC, Header: header}, true
 }
@@ -76,52 +79,50 @@ func printAOSFrame(header, data []byte, crc uint32) {
 	payloadASCII := bytesToASCII(data)
 	fmt.Printf("Spacecraft ID: %d\n", spacecraftID)
 	fmt.Printf("Virtual Channel ID: %d\n", virtualChannelID)
-	fmt.Printf("Payload Data (Hex): %s\n", bytesToHex(data))
-	fmt.Printf("Payload Data (ASCII): %s\n", payloadASCII)
 	fmt.Printf("CRC (Hex): %08x\n", crc)
+	fmt.Printf("Payload Data (Hex): %s\n", bytesToHex(data))
+	fmt.Printf("Payload Data (ASCII): \n")
+	println(payloadASCII)
 }
 
-func validatePUSTMFormat(data []byte) (*MessageData, bool) {
+func validatePUSTMFormat(data []byte, disableLogs bool) (*MessageData, bool) {
 	const CRCLength = 2
 	const minHeaderLength = 12
 
-	// Check if data length is sufficient
 	if len(data) < minHeaderLength+CRCLength {
-		fmt.Println("PUS TM data length is too short.")
+		if !disableLogs {
+			fmt.Println("PUS TM data length is too short.")
+		}
 		return nil, false
 	}
 
-	// Extract header
 	header := data[:minHeaderLength]
-
-	// Initialize variables for CRC
 	var crcReceived uint16
 	var dataWithoutCRC []byte
 
 	if CRCLength <= len(data) {
-		// Extract CRC and data without CRC
 		crcReceived = binary.BigEndian.Uint16(data[len(data)-CRCLength:])
 		dataWithoutCRC = data[:len(data)-CRCLength]
 	} else {
-		// If no CRC length, the whole data is considered as payload
 		dataWithoutCRC = data
 	}
 
-	// Calculate CRC over the header and payload (excluding CRC if present)
 	crcComputed := CRC16_CCITT_FUNC(dataWithoutCRC)
 
-	// Validate CRC if CRC length is non-zero
 	if crcReceived != crcComputed {
-		fmt.Printf("PUS TM CRC is invalid. Expected: %08x, Got: %08x\n", crcComputed, crcReceived)
+		if !disableLogs {
+			fmt.Printf("PUS TM CRC is invalid. Expected: %08x, Got: %08x\n", crcComputed, crcReceived)
+		}
 		return nil, false
 	}
 	dataWithoutCRC = dataWithoutCRC[len(header):]
 
-	// Extract and print details from header
 	serviceID := header[6]
 	subserviceID := header[7]
 
-	printPUSTMFrame(serviceID, subserviceID, dataWithoutCRC, crcReceived)
+	if !disableLogs {
+		printPUSTMFrame(serviceID, subserviceID, dataWithoutCRC, crcReceived)
+	}
 
 	return &MessageData{RawData: dataWithoutCRC, Header: header}, true
 }
@@ -129,42 +130,43 @@ func validatePUSTMFormat(data []byte) (*MessageData, bool) {
 func printPUSTMFrame(serviceID, subserviceID byte, data []byte, crc uint16) {
 	fmt.Printf("Service ID: %d\n", serviceID)
 	fmt.Printf("Subservice ID: %d\n", subserviceID)
-	fmt.Printf("Payload Data (Hex): %s\n", bytesToHex(data))
-	fmt.Printf("Payload Data (ASCII): %s\n", bytesToASCII(data))
 	fmt.Printf("CRC (Hex): %08x\n", crc)
+	fmt.Printf("Payload Data (Hex): %s\n", bytesToHex(data))
+	fmt.Printf("Payload Data (ASCII): \n")
+	payloadASCII := bytesToASCII(data)
+	println(payloadASCII)
 }
 
-func validatePUSTCFormat(data []byte) (*MessageData, bool) {
+func validatePUSTCFormat(data []byte, disableLogs bool) (*MessageData, bool) {
 	CRCLength := 2
-	// Calculate the minimum header length
 	const minHeaderLength = 10
 
-	// Check if the data is long enough to contain the header and CRC
 	if len(data) < minHeaderLength+CRCLength {
-		fmt.Println("PUSTC data length is too short.")
+		if !disableLogs {
+			fmt.Println("PUSTC data length is too short.")
+		}
 		return nil, false
 	}
 
-	// Extract the header and CRC from the data
 	header := data[:minHeaderLength]
 	crcReceived := binary.BigEndian.Uint16(data[len(data)-CRCLength:])
 	dataWithoutCRC := data[:len(data)-CRCLength]
 
-	// Compute the CRC for the data (excluding the CRC itself)
 	crcComputed := CRC16_CCITT_FUNC(dataWithoutCRC)
 
-	// Validate the computed CRC against the received CRC
 	if crcReceived != crcComputed {
-		fmt.Printf("PUSTC CRC is invalid. Expected: %08x, Got: %08x\n", crcComputed, crcReceived)
+		if !disableLogs {
+			fmt.Printf("PUSTC CRC is invalid. Expected: %08x, Got: %08x\n", crcComputed, crcReceived)
+		}
 		return nil, false
 	}
 
-	// Extract fields from the header
 	serviceID := header[0]
 	subserviceID := header[1]
 
-	// Print the parsed PUSTC packet details
-	printPUSTCFrame(serviceID, subserviceID, dataWithoutCRC[len(header):], crcReceived)
+	if !disableLogs {
+		printPUSTCFrame(serviceID, subserviceID, dataWithoutCRC[len(header):], crcReceived)
+	}
 
 	return &MessageData{RawData: dataWithoutCRC[len(header):], Header: header}, true
 }
@@ -172,33 +174,39 @@ func validatePUSTCFormat(data []byte) (*MessageData, bool) {
 func printPUSTCFrame(serviceID, subserviceID byte, data []byte, crc uint16) {
 	fmt.Printf("Service ID: %d\n", serviceID)
 	fmt.Printf("Subservice ID: %d\n", subserviceID)
-	fmt.Printf("Payload Data (Hex): %s\n", bytesToHex(data))
-	fmt.Printf("Payload Data (ASCII): %s\n", bytesToASCII(data))
 	fmt.Printf("CRC (Hex): %08x\n", crc)
+	fmt.Printf("Payload Data (Hex): %s\n", bytesToHex(data))
+	fmt.Printf("Payload Data (ASCII): \n")
+	payloadASCII := bytesToASCII(data)
+	println(payloadASCII)
 }
 
-func validateCCSDSFormat(data []byte) (*MessageData, bool) {
+func validateCCSDSFormat(data []byte, disableLogs bool) (*MessageData, bool) {
 	const headerLength = 9
 
-	// Check if data is long enough to contain the header and CRC
 	if len(data) < headerLength+4 { // 4 bytes for CRC
-		fmt.Println("CCSDS data length is too short.")
+		if !disableLogs {
+			fmt.Println("CCSDS data length is too short.")
+		}
 		return nil, false
 	}
 
-	// Extract the header and payload
 	header := data[:headerLength]
 	payload := data[headerLength : len(data)-4] // excluding CRC
 	crcReceived := binary.BigEndian.Uint32(data[len(data)-4:])
 
-	// Compute CRC for validation
 	crcComputed := crc32.ChecksumIEEE(data[:len(data)-4])
 	if crcReceived != crcComputed {
-		fmt.Printf("CCSDS CRC is invalid. Expected: %08x, Got: %08x\n", crcComputed, crcReceived)
+		if !disableLogs {
+			fmt.Printf("CCSDS CRC is invalid. Expected: %08x, Got: %08x\n", crcComputed, crcReceived)
+		}
 		return nil, false
 	}
 
-	fmt.Println("CCSDS data is valid.")
-	fmt.Printf("Payload Data (ASCII): %s\n", bytesToASCII(payload))
+	if !disableLogs {
+		fmt.Println("CCSDS data is valid.")
+		fmt.Printf("Payload Data (ASCII): %s\n", bytesToASCII(payload))
+	}
+
 	return &MessageData{RawData: payload, Header: header}, true
 }

@@ -40,7 +40,7 @@ export async function get(
       ...headers,
     },
   });
-  return response.data.data;
+  return response.data;
 }
 
 export async function post(path: string, data?: any, headers: Record<string, string> = {}) {
@@ -50,7 +50,7 @@ export async function post(path: string, data?: any, headers: Record<string, str
       ...headers,
     },
   });
-  return response.data.data;
+  return response.data;
 }
 
 export async function put(path: string, data?: any, headers: Record<string, string> = {}) {

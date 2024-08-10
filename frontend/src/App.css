@@ -1,42 +1,161 @@
-#root {
-  max-width: 1280px;
+/* Index.css */
+.container {
+  position: relative;
+  width: 1200px;
+  height: 600px;
   margin: 0 auto;
-  padding: 2rem;
+}
+
+.satellite, .converter {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  background-size: cover;
+  background-position: center;
+}
+
+.satellite {
+  background-image: url('/satellite.png');
+}
+
+.converter {
+  width: 50px;
+  height: 50px;
+  background-image: url('/converter.jpeg');
+}
+
+#satellite1 {
+  top: 25px;
+  left: 150px;
+  transform: rotate(-125deg);
+}
+
+#satellite2 {
+  top: 25px;
+  left: 1150px;
+}
+
+#satellite3 {
+  top: 525px;
+  left: 630px;
+  transform: rotate(120deg);
+}
+
+#converter1 {
+  top: 150px;
+  left: 320px;
+}
+
+#converter2 {
+  top: 150px;
+  left: 1020px;
+}
+
+#converter3 {
+  top: 400px;
+  left: 680px;
+}
+
+.line {
+  position: absolute;
+  background-color: black;
+  transform-origin: 0 0;
+}
+
+#line1 {
+  top: 120px;
+  left: 265px;
+  width: 2px;
+  height: 60px;
+  transform: rotate(-55deg);
+}
+
+#line2 {
+  top: 120px;
+  left: 1140px;
+  width: 2px;
+  height: 60px;
+  transform: rotate(55deg);
+}
+
+#line3 {
+  top: 455px;
+  left: 705px;
+  width: 2px;
+  height: 60px;
+  transform: rotate(0deg);
+}
+
+#line4 {
+  width: 2px;
+  height: 320px;
+  top: 190px;
+  left: 375px;
+  transform: rotate(-80deg);
+}
+
+#line5 {
+  width: 2px;
+  height: 320px;
+  top: 245px;
+  left: 690px;
+  transform: rotate(-100deg);
+}
+
+#line6 {
+  width: 2px;
+  height: 140px;
+  top: 245px;
+  left: 690px;
+  transform: rotate(-5deg);
+}
+
+/* Label styling */
+.label {
+  padding: 2px 5px;
+  border: 1px solid black;
+  border-radius: 3px;
   text-align: center;
+  white-space: nowrap;
+  position: absolute;
+  color: black;
+  background-color: white;
+  font-size: 20px;
+  max-width: 300px; /* Restrict the maximum width */
+  cursor: pointer; /* Indicate that the label is interactive */
+  transform: rotate(0deg); /* Ensure label is not rotated */
+  overflow: hidden;
+}
+.tooltip {
+  position: absolute;
+  background-color: white;
+  color: black;
+  border: 1px solid black;
+  padding: 2px 5px;
+  border-radius: 3px;
+  z-index: 1000;
+  transition: opacity 0.3s ease;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+.label1 {
+  top: -50px;
+  left: 250px;
+  transform: translateX(-50%);
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.label2 {
+  top: -50px;
+  left: 1050px;
+  transform: translateX(-50%);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+.label3 {
+  top: 560px;
+  left: 780px;
 }
 
-.card {
-  padding: 2em;
-}
-
-.read-the-docs {
-  color: #888;
+.label4 {
+  top: 140px;
+  left: 660px;
+  transform: translateX(-50%);
 }

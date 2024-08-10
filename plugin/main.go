@@ -29,8 +29,23 @@ func main() {
 
 	flag.Parse()
 
-	if *outputFormat == "" {
-		fmt.Println("Error: output-format must be provided")
+	if *inputFormat != "" && *hexInput != "" && *outputFormat == "" && *message == "" {
+		data, err := hex.DecodeString(*hexInput)
+		if err != nil {
+			log.Fatalf("Failed to decode hex string: %v", err)
+		}
+
+		if !isValidFormat(*inputFormat) {
+			fmt.Println("Error: input-format must be one of: aos, pus_tm, pus_tc, ccsds")
+			return
+		}
+
+		payload, isValid := validateDataFormat(Format(*inputFormat), data, true)
+		if !isValid {
+			fmt.Println("Invalid input")
+			return
+		}
+		fmt.Println(bytesToASCII(payload.RawData))
 		return
 	}
 
@@ -64,7 +79,7 @@ func main() {
 		}
 
 		// Validate data format (Implement validateDataFormat according to your needs)
-		payload, isValid := validateDataFormat(Format(*inputFormat), data)
+		payload, isValid := validateDataFormat(Format(*inputFormat), data, false)
 		if !isValid {
 			fmt.Println("Error: The data format does not match the specified input format")
 			return
