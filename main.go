@@ -17,43 +17,70 @@ const (
 )
 
 func main() {
-	inputFormat := flag.String("input-format", "ccsds", "Input format: aos, tm, or ccsds (default: ccsds)")
-	outputFormat := flag.String("output-format", "ccsds", "Output format: aos, tm, or ccsds (default: ccsds)")
-	hexInput := flag.String("data", "", "Data to be processed (required)")
+	inputFormat := flag.String("input-format", "", "Input format: aos, pus_tm, pus_tc, or ccsds (required for format conversion)")
+	outputFormat := flag.String("output-format", "", "Output format: aos, pus_tm, pus_tc, or ccsds (required)")
+	hexInput := flag.String("data", "", "Hex data to be processed (required for format conversion)")
+	message := flag.String("message", "", "String message to be encoded (required for message conversion)")
 
-	flag.StringVar(inputFormat, "if", "ccsds", "Short flag for --input-format")
-	flag.StringVar(outputFormat, "of", "ccsds", "Short flag for --output-format")
+	flag.StringVar(inputFormat, "if", "", "Short flag for --input-format")
+	flag.StringVar(outputFormat, "of", "", "Short flag for --output-format")
 	flag.StringVar(hexInput, "d", "", "Short flag for --data")
+	flag.StringVar(message, "m", "", "Short flag for --message")
 
 	flag.Parse()
 
-	if *hexInput == "" {
-		fmt.Println("Error: data must be provided")
+	if *outputFormat == "" {
+		fmt.Println("Error: output-format must be provided")
 		return
 	}
 
-	data, err := hex.DecodeString(*hexInput)
-	if err != nil {
-		log.Fatalf("Failed to decode hex string: %v", err)
-	}
+	// Case 1: Message conversion to a specific output format
+	if *message != "" && *inputFormat == "" && *hexInput == "" {
+		data := []byte(*message)
+		outputData := convertData(Format(*outputFormat), &MessageData{RawData: data})
 
-	if !isValidFormat(*inputFormat) {
-		fmt.Println("Error: input-format must be one of: aos, tm, ccsds")
+		// Print the converted data as a hex string
+		fmt.Println("Converted Data:")
+		fmt.Println(bytesToHex(outputData))
 		return
 	}
 
-	if !isValidFormat(*outputFormat) {
-		fmt.Println("Error: output-format must be one of: aos, tm, ccsds")
+	// Case 2: Format conversion from input format to output format
+	if *hexInput != "" && *inputFormat != "" {
+		data, err := hex.DecodeString(*hexInput)
+		if err != nil {
+			log.Fatalf("Failed to decode hex string: %v", err)
+		}
+
+		// Validate formats
+		if !isValidFormat(*inputFormat) {
+			fmt.Println("Error: input-format must be one of: aos, pus_tm, pus_tc, ccsds")
+			return
+		}
+
+		if !isValidFormat(*outputFormat) {
+			fmt.Println("Error: output-format must be one of: aos, pus_tm, pus_tc, ccsds")
+			return
+		}
+
+		// Validate data format (Implement validateDataFormat according to your needs)
+		payload, isValid := validateDataFormat(Format(*inputFormat), data)
+		if !isValid {
+			fmt.Println("Error: The data format does not match the specified input format")
+			return
+		}
+
+		// Convert the data using the appropriate generator function
+		outputData := convertData(Format(*outputFormat), payload)
+
+		// Print the converted data as a hex string
+		fmt.Println("Converted Data:")
+		fmt.Println(bytesToHex(outputData))
 		return
 	}
 
-	if !validateDataFormat(Format(*inputFormat), data) {
-		fmt.Println("Error: The data format does not match the specified input format")
-		return
-	}
-
-	outputData := convertData(Format(*inputFormat), Format(*outputFormat), data)
-
-	fmt.Println("Converted Data:")
-	fmt.Println(outputData)
+	// If neither valid combination is provided
+	fmt.Println("Error: Invalid combination of flags provided. Use either:")
+	fmt.Println("1. --message and --output-format for message conversion")
+	fmt.Println("2. --input-format, --output-format, and --data for format conversion")
 }

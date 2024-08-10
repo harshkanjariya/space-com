@@ -1,75 +1,135 @@
 package main
 
-func convertData(inputFormat, outputFormat Format, input []byte) []byte {
-	if inputFormat == outputFormat {
-		return input
-	}
+import (
+	"bytes"
+	"encoding/binary"
+	"hash/crc32"
+)
 
-	switch inputFormat {
-	case AOS:
-		return convertFromAOS(outputFormat, input)
-	case PUS_TM:
-		return convertFromTM(outputFormat, input)
+func convertData(outputFormat Format, input *MessageData) []byte {
+	switch outputFormat {
 	case CCSDS:
-		return convertFromCCSDS(outputFormat, input)
+		response, err := generateCCSDSPacket(0x00, 0x00, 0x0000, input)
+		if err != nil {
+			println(err)
+		}
+		return response
+	case AOS:
+		response, err := generateAOSPacket(0x00, 0x00, input)
+		if err != nil {
+			println(err)
+		}
+		return response
+	case PUS_TM:
+		response, err := generatePUSTMPacket(0x00, 0x00, input)
+		if err != nil {
+			println(err)
+		}
+		return response
+	case PUS_TC:
+		response, err := generatePUSTCPacket(0x00, 0x00, input)
+		if err != nil {
+			println(err)
+		}
+		return response
 	default:
 		return []byte("Unsupported format")
 	}
 }
 
-func convertFromAOS(outputFormat Format, input []byte) []byte {
-	switch outputFormat {
-	case PUS_TM:
-		return convertAOSToTM(input)
-	case CCSDS:
-		return convertAOSToCCSDS(input)
-	default:
-		return input
+// generateAOSPacket generates an AOS packet
+func generateAOSPacket(spacecraftID uint16, vcID byte, message *MessageData) ([]byte, error) {
+	const headerLength = 3
+	buffer := new(bytes.Buffer)
+
+	header := make([]byte, headerLength)
+	binary.BigEndian.PutUint16(header[:2], spacecraftID)
+	header[2] = vcID
+
+	buffer.Write(header)
+	if _, err := buffer.Write(message.RawData); err != nil {
+		return nil, err
 	}
-}
 
-func convertFromTM(outputFormat Format, input []byte) []byte {
-	switch outputFormat {
-	case AOS:
-		return convertTMToAOS(input)
-	case CCSDS:
-		return convertTMToCCSDS(input)
-	default:
-		return input
+	crc := crc32.ChecksumIEEE(buffer.Bytes())
+	if err := binary.Write(buffer, binary.BigEndian, crc); err != nil {
+		return nil, err
 	}
+
+	return buffer.Bytes(), nil
 }
 
-func convertFromCCSDS(outputFormat Format, input []byte) []byte {
-	switch outputFormat {
-	case AOS:
-		return convertCCSDSToAOS(input)
-	case PUS_TM:
-		return convertCCSDSToTM(input)
-	default:
-		return input
+// generatePUSTMPacket generates a PUS TM packet
+func generatePUSTMPacket(serviceID, subserviceID byte, message *MessageData) ([]byte, error) {
+	const headerLength = 12
+
+	buffer := new(bytes.Buffer)
+
+	header := make([]byte, headerLength)
+	header[6] = serviceID
+	header[7] = subserviceID
+
+	buffer.Write(header)
+	if _, err := buffer.Write(message.RawData); err != nil {
+		return nil, err
 	}
+
+	crc := CRC16_CCITT_FUNC(buffer.Bytes())
+	if err := binary.Write(buffer, binary.BigEndian, crc); err != nil {
+		return nil, err
+	}
+
+	return buffer.Bytes(), nil
 }
 
-func convertAOSToTM(input []byte) []byte {
-	return append([]byte("AOS to TM: "), input...)
+// generatePUSTCPacket generates a PUS TC packet
+func generatePUSTCPacket(serviceID, subserviceID byte, message *MessageData) ([]byte, error) {
+	const headerLength = 10
+
+	buffer := new(bytes.Buffer)
+
+	header := make([]byte, headerLength)
+	header[0] = serviceID
+	header[1] = subserviceID
+
+	buffer.Write(header)
+	if _, err := buffer.Write(message.RawData); err != nil {
+		return nil, err
+	}
+
+	crc := CRC16_CCITT_FUNC(buffer.Bytes())
+	if err := binary.Write(buffer, binary.BigEndian, crc); err != nil {
+		return nil, err
+	}
+
+	return buffer.Bytes(), nil
 }
 
-func convertAOSToCCSDS(input []byte) []byte {
-	return append([]byte("AOS to CCSDS: "), input...)
-}
+// converter.go
+func generateCCSDSPacket(packetType byte, apid byte, sequenceCount uint16, message *MessageData) ([]byte, error) {
+	const headerLength = 6
+	packetLength := uint16(len(message.RawData) + headerLength + 4)
 
-func convertTMToAOS(input []byte) []byte {
-	return append([]byte("TM to AOS: "), input...)
-}
+	buffer := new(bytes.Buffer)
 
-func convertTMToCCSDS(input []byte) []byte {
-	return append([]byte("TM to CCSDS: "), input...)
-}
+	header := make([]byte, headerLength)
+	header[0] = 0x00
+	header[1] = packetType
+	header[2] = 0x00
+	header[3] = 0x00
+	binary.BigEndian.PutUint16(header[4:6], sequenceCount)
 
-func convertCCSDSToAOS(input []byte) []byte {
-	return append([]byte("CCSDS to AOS: "), input...)
-}
+	buffer.Write(header)
+	buffer.WriteByte(apid)
+	binary.Write(buffer, binary.BigEndian, packetLength)
+	if _, err := buffer.Write(message.RawData); err != nil {
+		return nil, err
+	}
 
-func convertCCSDSToTM(input []byte) []byte {
-	return append([]byte("CCSDS to TM: "), input...)
+	crc := crc32.ChecksumIEEE(buffer.Bytes())
+	if err := binary.Write(buffer, binary.BigEndian, crc); err != nil {
+		return nil, err
+	}
+
+	return buffer.Bytes(), nil
 }

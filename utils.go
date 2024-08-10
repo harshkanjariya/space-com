@@ -5,6 +5,11 @@ import (
 	"fmt"
 )
 
+type MessageData struct {
+	RawData []byte
+	Header  []byte
+}
+
 func bytesToHex(data []byte) string {
 	return fmt.Sprintf("%x", data)
 }

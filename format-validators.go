@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"hash/crc32"
@@ -16,7 +15,7 @@ func isValidFormat(format string) bool {
 	}
 }
 
-func validateDataFormat(inputFormat Format, data []byte) bool {
+func validateDataFormat(inputFormat Format, data []byte) (*MessageData, bool) {
 	switch inputFormat {
 	case AOS:
 		println("validating AOS Format...")
@@ -28,18 +27,18 @@ func validateDataFormat(inputFormat Format, data []byte) bool {
 	case CCSDS:
 		return validateCCSDSFormat(data)
 	default:
-		return false
+		return nil, false
 	}
 }
 
-func validateAOSFormat(data []byte) bool {
+func validateAOSFormat(data []byte) (*MessageData, bool) {
 	// Define minimum header length: spacecraft ID (2 bytes) + virtual channel ID (1 byte) + CRC (4 bytes)
 	const minHeaderLength = 2 + 1 + 4
 
 	// Check if data is long enough to contain at least the header and CRC
 	if len(data) < minHeaderLength {
 		println("AOS header length is too short.")
-		return false
+		return nil, false
 	}
 
 	// Extract the header and CRC from the data
@@ -53,7 +52,7 @@ func validateAOSFormat(data []byte) bool {
 	// Validate the computed CRC against the received CRC
 	if crcReceived != crcComputed {
 		println("AOS crc is invalid.")
-		return false
+		return nil, false
 	}
 
 	if len(dataWithoutCRC) >= 2 && dataWithoutCRC[0] == 0x00 && dataWithoutCRC[1] == 0x7b && dataWithoutCRC[2] == 0x7c {
@@ -62,7 +61,7 @@ func validateAOSFormat(data []byte) bool {
 
 	printAOSFrame(header, dataWithoutCRC, crcReceived)
 
-	return true
+	return &MessageData{RawData: dataWithoutCRC, Header: header}, true
 }
 
 func printAOSFrame(header, data []byte, crc uint32) {
@@ -82,14 +81,14 @@ func printAOSFrame(header, data []byte, crc uint32) {
 	fmt.Printf("CRC (Hex): %08x\n", crc)
 }
 
-func validatePUSTMFormat(data []byte) bool {
+func validatePUSTMFormat(data []byte) (*MessageData, bool) {
 	const CRCLength = 2
 	const minHeaderLength = 12
 
 	// Check if data length is sufficient
 	if len(data) < minHeaderLength+CRCLength {
 		fmt.Println("PUS TM data length is too short.")
-		return false
+		return nil, false
 	}
 
 	// Extract header
@@ -112,23 +111,22 @@ func validatePUSTMFormat(data []byte) bool {
 	crcComputed := CRC16_CCITT_FUNC(dataWithoutCRC)
 
 	// Validate CRC if CRC length is non-zero
-	if CRCLength > 0 && crcReceived != crcComputed {
+	if crcReceived != crcComputed {
 		fmt.Printf("PUS TM CRC is invalid. Expected: %08x, Got: %08x\n", crcComputed, crcReceived)
-		return false
+		return nil, false
 	}
 	dataWithoutCRC = dataWithoutCRC[len(header):]
 
 	// Extract and print details from header
 	serviceID := header[6]
 	subserviceID := header[7]
-	timestamp := header[2 : 2+1]
 
-	printPUSTMFrame(serviceID, subserviceID, timestamp, dataWithoutCRC, crcReceived)
+	printPUSTMFrame(serviceID, subserviceID, dataWithoutCRC, crcReceived)
 
-	return true
+	return &MessageData{RawData: dataWithoutCRC, Header: header}, true
 }
 
-func printPUSTMFrame(serviceID, subserviceID byte, timestamp []byte, data []byte, crc uint16) {
+func printPUSTMFrame(serviceID, subserviceID byte, data []byte, crc uint16) {
 	fmt.Printf("Service ID: %d\n", serviceID)
 	fmt.Printf("Subservice ID: %d\n", subserviceID)
 	fmt.Printf("Payload Data (Hex): %s\n", bytesToHex(data))
@@ -136,7 +134,7 @@ func printPUSTMFrame(serviceID, subserviceID byte, timestamp []byte, data []byte
 	fmt.Printf("CRC (Hex): %08x\n", crc)
 }
 
-func validatePUSTCFormat(data []byte) bool {
+func validatePUSTCFormat(data []byte) (*MessageData, bool) {
 	CRCLength := 2
 	// Calculate the minimum header length
 	const minHeaderLength = 10
@@ -144,7 +142,7 @@ func validatePUSTCFormat(data []byte) bool {
 	// Check if the data is long enough to contain the header and CRC
 	if len(data) < minHeaderLength+CRCLength {
 		fmt.Println("PUSTC data length is too short.")
-		return false
+		return nil, false
 	}
 
 	// Extract the header and CRC from the data
@@ -158,7 +156,7 @@ func validatePUSTCFormat(data []byte) bool {
 	// Validate the computed CRC against the received CRC
 	if crcReceived != crcComputed {
 		fmt.Printf("PUSTC CRC is invalid. Expected: %08x, Got: %08x\n", crcComputed, crcReceived)
-		return false
+		return nil, false
 	}
 
 	// Extract fields from the header
@@ -168,7 +166,7 @@ func validatePUSTCFormat(data []byte) bool {
 	// Print the parsed PUSTC packet details
 	printPUSTCFrame(serviceID, subserviceID, dataWithoutCRC[len(header):], crcReceived)
 
-	return true
+	return &MessageData{RawData: dataWithoutCRC[len(header):], Header: header}, true
 }
 
 func printPUSTCFrame(serviceID, subserviceID byte, data []byte, crc uint16) {
@@ -179,6 +177,28 @@ func printPUSTCFrame(serviceID, subserviceID byte, data []byte, crc uint16) {
 	fmt.Printf("CRC (Hex): %08x\n", crc)
 }
 
-func validateCCSDSFormat(data []byte) bool {
-	return bytes.HasPrefix(data, []byte("CCSDS:"))
+func validateCCSDSFormat(data []byte) (*MessageData, bool) {
+	const headerLength = 9
+
+	// Check if data is long enough to contain the header and CRC
+	if len(data) < headerLength+4 { // 4 bytes for CRC
+		fmt.Println("CCSDS data length is too short.")
+		return nil, false
+	}
+
+	// Extract the header and payload
+	header := data[:headerLength]
+	payload := data[headerLength : len(data)-4] // excluding CRC
+	crcReceived := binary.BigEndian.Uint32(data[len(data)-4:])
+
+	// Compute CRC for validation
+	crcComputed := crc32.ChecksumIEEE(data[:len(data)-4])
+	if crcReceived != crcComputed {
+		fmt.Printf("CCSDS CRC is invalid. Expected: %08x, Got: %08x\n", crcComputed, crcReceived)
+		return nil, false
+	}
+
+	fmt.Println("CCSDS data is valid.")
+	fmt.Printf("Payload Data (ASCII): %s\n", bytesToASCII(payload))
+	return &MessageData{RawData: payload, Header: header}, true
 }
