@@ -24,6 +24,7 @@ export class ConverterService {
 
       return stdout;
     } catch (error) {
+      console.log("Error converting: ", error);
       throw new InternalServerErrorException("Conversion failed");
     }
   }
@@ -45,6 +46,7 @@ export class ConverterService {
 
       return stdout;
     } catch (error) {
+      console.log("Error encoding: ", error);
       throw new InternalServerErrorException("Encoding failed");
     }
   }
@@ -65,6 +67,7 @@ export class ConverterService {
 
       return stdout;
     } catch (error) {
+      console.log("Error decoding: ", error);
       throw new InternalServerErrorException("Decoding failed");
     }
   }
