@@ -37,7 +37,7 @@ export class ConverterService {
     }
 
     try {
-      const command = `go run ../plugin/*.go -of=${body.outputFormat} -m="${body.message}"`;
+      const command = `./converter.bin -of=${body.outputFormat} -m="${body.message}"`;
       const { stdout, stderr } = await execPromise(command);
 
       if (stderr) {
